@@ -23,10 +23,13 @@ app.config['SQLALCHEMY_DATABASE_URI'] = 'mysql+mysqlconnector://root:Jahvante.97
 class Base(DeclarativeBase):
     pass
 
-#========== Initialization  ===========
+#========== Extensions Initialization ===========
 
 db = SQLAlchemy(app, model_class=Base)
 ma = Marshmallow(app)
+
+db.init_app(app)
+ma.init_app(app)
 
 #========== Association Table  ===========
 
@@ -110,7 +113,7 @@ def create_user():
     except ValidationError as err:
         return jsonify(err.messages), 400
     
-    new_user = User(name=user_data["name"], email=user_data["email"])
+    new_user = user_data
     db.session.add(new_user)
     db.session.commit()
 
@@ -288,7 +291,7 @@ def get_orders_per_user(user_id):
     return orders_schema.jsonify(user.user_orders), 200
 
 
-@app.route("/orders/<order_id>/products", methods=["GET"])
+@app.route("/orders/<int:order_id>/products", methods=["GET"])
 def get_products_in_order(order_id):
     try:
         order_data = db.session.get(Order, order_id)
@@ -297,11 +300,11 @@ def get_products_in_order(order_id):
         return jsonify(err.messages), 400
      
 
-    return order_schema.jsonify(order_data.products), 201
+    return order_schema.jsonify(order_data), 201
 
 #========== Update ===========
 
-@app.route("/orders/<order_id>/add_product/<product_id>", methods=["PUT"])
+@app.route("/orders/<int:order_id>/add_product/<int:product_id>", methods=["PUT"])
 def add_product_to_order(order_id, product_id):
     try:
         order = db.session.get(Order, order_id)
@@ -322,7 +325,7 @@ def add_product_to_order(order_id, product_id):
 
 #========== Delete ===========
 
-@app.route("/orders/<order_id>/remove_product/<product_id>", methods=["DELETE"])
+@app.route("/orders/<int:order_id>/remove_product/<int:product_id>", methods=["DELETE"])
 def remove_product_from_order(order_id, product_id):
     try:
         order = db.session.get(Order, order_id)
