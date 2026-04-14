@@ -28,8 +28,6 @@ class Base(DeclarativeBase):
 db = SQLAlchemy(app, model_class=Base)
 ma = Marshmallow(app)
 
-db.init_app(app)
-ma.init_app(app)
 
 #========== Association Table  ===========
 
@@ -46,8 +44,8 @@ class User(Base):
     __tablename__ = "user"
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     name: Mapped[str] = mapped_column(String(50), nullable=False)
-    address: Mapped[Optional[str]] = mapped_column(String(200))
-    email: Mapped[Optional[str]] = mapped_column(String(200), unique=True)
+    address: Mapped[str] = mapped_column(String(200))
+    email: Mapped[str] = mapped_column(String(200), unique=True)
 
     user_orders : Mapped[List["Order"]] = relationship(back_populates="users")
 
@@ -60,6 +58,7 @@ class Order(Base):
     order_date: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     user_id: Mapped[int] = mapped_column(ForeignKey("user.id"))
     
+    user_id: Mapped[int] = mapped_column(ForeignKey("user.id"))
     users: Mapped["User"] = relationship( back_populates="user_orders")
     products: Mapped[List["Product"]] = relationship(secondary=order_product, back_populates="orders")
 
@@ -79,7 +78,7 @@ class Product(Base):
 class UserSchema(ma.SQLAlchemyAutoSchema):
     class Meta:
         model = User
-        load_instance = True
+        
 
 class ProductSchema(ma.SQLAlchemyAutoSchema):
     class Meta:
@@ -113,7 +112,7 @@ def create_user():
     except ValidationError as err:
         return jsonify(err.messages), 400
     
-    new_user = user_data
+    new_user = User(**user_data)
     db.session.add(new_user)
     db.session.commit()
 
@@ -278,6 +277,15 @@ def create_order():
 
 #========== Read ===========
 
+@app.route("/orders", methods=["GET"])
+def get_orders():
+    try:
+        orders = db.session.query(Order).all()
+    except ValidationError as err:
+        return jsonify(err.messages), 400
+
+    return orders_schema.jsonify(orders), 200
+
 @app.route("/orders/users/<int:user_id>", methods=["GET"])
 def get_orders_per_user(user_id):
     try:
@@ -300,7 +308,8 @@ def get_products_in_order(order_id):
         return jsonify(err.messages), 400
      
 
-    return order_schema.jsonify(order_data), 201
+    products = order_data.products
+    return order_schema.jsonify({"products": products}), 200
 
 #========== Update ===========
 
@@ -321,7 +330,9 @@ def add_product_to_order(order_id, product_id):
     order.products.append(product)
 
     db.session.commit()
-    return order_schema.jsonify(order), 200
+
+    product = order.products
+    return order_schema.jsonify({"products": product}), 200
 
 #========== Delete ===========
 
@@ -344,9 +355,8 @@ def remove_product_from_order(order_id, product_id):
 
     db.session.commit()
         
-    db.session.delete(order)
-    db.session.commit()
-    return order_schema.jsonify(order), 200
+    current_products = order.products
+    return order_schema.jsonify({"products": current_products}), 200
 
 #========== Run App ===========
 
